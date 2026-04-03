@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CarouselAI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#06060a;color:#eeeef5;font-family:Inter,sans-serif;min-height:100vh}
+@keyframes bounce{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-10px);opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.fu{animation:fadeUp .4s ease forwards}
+select,textarea,input{-webkit-appearance:none}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState} = React;
+const KEY = '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';
+const TH=[
+  {bg:'linear-gradient(135deg,#1a1a2e,#16213e)',tx:'#e0e0ff',ac:'#6c63ff'},
+  {bg:'linear-gradient(135deg,#0f2027,#203a43,#2c5364)',tx:'#e0f7fa',ac:'#43e97b'},
+  {bg:'linear-gradient(135deg,#1a0533,#2d0b5e)',tx:'#f3e5f5',ac:'#ff6584'},
+  {bg:'linear-gradient(135deg,#0d1b0d,#1a3a1a)',tx:'#e8f5e9',ac:'#69f0ae'},
+  {bg:'linear-gradient(135deg,#1c0a00,#3d1a00)',tx:'#fff3e0',ac:'#f7971e'},
+];
+const STY=['📚 Educational','🔥 Motivational','📋 Tips & Tricks','📖 Storytelling','🔍 Case Study','❓ Myth-Busting'];
+const IND=['Marketing & Advertising','E-commerce & Retail','Health & Wellness','Finance & Investing','Real Estate','SaaS & Tech','Education & Coaching','Food & Beverage','Fashion & Beauty','Travel & Hospitality','Other'];
+const PLT=['Instagram','LinkedIn','TikTok','Facebook','Pinterest'];
+const LS=['Analyzing your business...','Crafting carousel topics...','Writing slide content...','Generating captions...','Adding hashtags...'];
+
+function App(){
+  const [biz,setBiz]=useState('');
+  const [svc,setSvc]=useState('');
+  const [ind,setInd]=useState(IND[0]);
+  const [plt,setPlt]=useState(PLT[0]);
+  const [sty,setSty]=useState(STY[0]);
+  const [batch,setBatch]=useState(false);
+  const [cnt,setCnt]=useState(3);
+  const [loading,setLoading]=useState(false);
+  const [step,setStep]=useState(0);
+  const [posts,setPosts]=useState([]);
+  const [err,setErr]=useState('');
+  const [active,setActive]=useState({});
+  const [copied,setCopied]=useState({});
+  const [svcErr,setSvcErr]=useState(false);
+  const mob=window.innerWidth<700;
+
+  async function generate(){
+    if(!svc.trim()){setSvcErr(true);setTimeout(()=>setSvcErr(false),1500);return;}
+    const n=batch?cnt:1;
+    setLoading(true);setErr('');setPosts([]);setStep(0);
+    const iv=setInterval(()=>setStep(s=>s<LS.length-1?s+1:s),700);
+    const prompt=`You are a viral social media content expert.
+Business: ${biz||'My Business'}
+Services: ${svc}
+Industry: ${ind}, Platform: ${plt}, Style: ${sty.replace(/^[^\w]+/,'').trim()}
+Generate ${n} carousel post(s) each with exactly 5 slides.
+Return ONLY valid JSON array, no markdown no backticks:
+[{"topic":"3-5 word title","slides":[{"emoji":"emoji","title":"max 8 word headline","body":"2-3 lines content","cta":"only slide 1 and 5 else empty string"}],"caption":"2-3 sentence caption","hashtags":"12-15 hashtags"}]
+Slide 1: Hook cta="Swipe to learn more →", Slides 2-4: no cta, Slide 5: Summary + cta like "Follow for more"
+Make topics DIFFERENT and specific to this business.`;
+    try{
+      const r=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})
+      });
+      clearInterval(iv);
+      if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'HTTP '+r.status);}
+      const d=await r.json();
+      const raw=d.content.map(i=>i.text||'').join('');
+      const clean=raw.replace(/```json|```/g,'').trim();
+      const p=JSON.parse(clean);
+      setPosts(p);
+      setActive(Object.fromEntries(p.map((_,i)=>[i,0])));
+    }catch(e){clearInterval(iv);setErr('Error: '+e.message);}
+    setLoading(false);
+  }
+
+  function copy(idx){
+    const p=posts[idx];
+    navigator.clipboard.writeText(p.caption+'\n\n'+p.hashtags);
+    setCopied(c=>({...c,[idx]:true}));
+    setTimeout(()=>setCopied(c=>({...c,[idx]:false})),2000);
+  }
+
+  const iStyle=(ex={})=>({width:'100%',background:'#16161f',border:'1px solid #2e2e42',borderRadius:10,color:'#eeeef5',fontSize:'0.88rem',padding:'10px 13px',outline:'none',fontFamily:'Inter,sans-serif',boxSizing:'border-box',...ex});
+  const lStyle={display:'block',fontSize:'0.63rem',fontWeight:700,letterSpacing:'1.2px',textTransform:'uppercase',color:'#5a5a72',marginBottom:6};
+
+  return(
+    <div style={{minHeight:'100vh'}}>
+      {/* NAV */}
+      <div style={{borderBottom:'1px solid #252535',padding:'16px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,background:'#06060a',zIndex:100}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:34,height:34,background:'linear-gradient(135deg,#6c63ff,#ff6584)',borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem'}}>⧉</div>
+          <span style={{fontSize:'1.2rem',fontWeight:800,fontFamily:'Syne,sans-serif'}}>Carousel<span style={{color:'#6c63ff'}}>AI</span></span>
+        </div>
+        <span style={{fontSize:'0.6rem',color:'#43e97b',border:'1px solid rgba(67,233,123,0.3)',padding:'3px 10px',borderRadius:20,letterSpacing:'0.8px'}}>AI POWERED</span>
+      </div>
+
+      {/* GRID */}
+      <div style={{maxWidth:1120,margin:'0 auto',padding:'24px 16px',display:'grid',gridTemplateColumns:mob?'1fr':'300px 1fr',gap:20,alignItems:'start'}}>
+
+        {/* FORM */}
+        <div style={{background:'#0e0e16',border:'1px solid #252535',borderRadius:18,overflow:'hidden',position:mob?'static':'sticky',top:68}}>
+          <div style={{padding:'13px 18px',borderBottom:'1px solid #252535',display:'flex',alignItems:'center',gap:8}}>
+            <div style={{width:7,height:7,borderRadius:'50%',background:'#6c63ff',boxShadow:'0 0 8px #6c63ff'}}/>
+            <span style={{fontSize:'0.63rem',fontWeight:700,letterSpacing:'1.8px',textTransform:'uppercase',color:'#5a5a72'}}>Configure</span>
+          </div>
+          <div style={{padding:18,display:'flex',flexDirection:'column',gap:14}}>
+            <div><label style={lStyle}>Business Name</label>
+              <input style={iStyle()} value={biz} onChange={e=>setBiz(e.target.value)} placeholder="e.g. Nova Marketing Co."/>
+            </div>
+            <div><label style={lStyle}>Services / Products *</label>
+              <textarea style={iStyle({resize:'none',height:76,lineHeight:1.55,borderColor:svcErr?'#ff6584':'#2e2e42'})}
+                value={svc} onChange={e=>setSvc(e.target.value)} placeholder="e.g. Social media management, content creation..."/>
+            </div>
+            <div><label style={lStyle}>Industry</label>
+              <select style={iStyle()} value={ind} onChange={e=>setInd(e.target.value)}>
+                {IND.map(i=><option key={i}>{i}</option>)}
+              </select>
+            </div>
+            <div><label style={lStyle}>Target Platform</label>
+              <select style={iStyle()} value={plt} onChange={e=>setPlt(e.target.value)}>
+                {PLT.map(p=><option key={p}>{p}</option>)}
+              </select>
+            </div>
+            <div><label style={lStyle}>Content Style</label>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                {STY.map(s=>(
+                  <div key={s} onClick={()=>setSty(s)} style={{padding:'8px 6px',border:`1px solid ${sty===s?'#6c63ff':'#2e2e42'}`,borderRadius:9,fontSize:'0.72rem',fontWeight:500,cursor:'pointer',textAlign:'center',color:sty===s?'#6c63ff':'#5a5a72',background:sty===s?'rgba(108,99,255,0.12)':'transparent',userSelect:'none'}}>
+                    {s}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div onClick={()=>setBatch(b=>!b)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#16161f',border:'1px solid #2e2e42',borderRadius:10,padding:'11px 13px',cursor:'pointer',userSelect:'none'}}>
+              <div>
+                <div style={{fontSize:'0.83rem',fontWeight:500}}>📅 Batch Mode</div>
+                <div style={{fontSize:'0.67rem',color:'#5a5a72',marginTop:2}}>Generate multiple at once</div>
+              </div>
+              <div style={{width:40,height:22,background:batch?'#6c63ff':'#2e2e42',borderRadius:11,position:'relative',flexShrink:0}}>
+                <div style={{position:'absolute',width:16,height:16,borderRadius:'50%',background:'white',top:3,left:batch?21:3,transition:'left 0.2s'}}/>
+              </div>
+            </div>
+            {batch&&(
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <span style={{fontSize:'0.83rem',flex:1}}>Number of carousels</span>
+                <button onClick={()=>setCnt(c=>Math.max(1,c-1))} style={{width:30,height:30,background:'#16161f',border:'1px solid #2e2e42',borderRadius:7,color:'#eeeef5',fontSize:'1.1rem',cursor:'pointer'}}>−</button>
+                <span style={{fontWeight:700,color:'#6c63ff',minWidth:24,textAlign:'center'}}>{cnt}</span>
+                <button onClick={()=>setCnt(c=>Math.min(7,c+1))} style={{width:30,height:30,background:'#16161f',border:'1px solid #2e2e42',borderRadius:7,color:'#eeeef5',fontSize:'1.1rem',cursor:'pointer'}}>+</button>
+              </div>
+            )}
+            <button onClick={generate} disabled={loading} style={{padding:13,background:loading?'rgba(108,99,255,0.35)':'linear-gradient(135deg,#6c63ff,#9b59b6)',border:'none',borderRadius:12,color:'white',fontSize:'0.92rem',fontWeight:700,letterSpacing:'1px',cursor:loading?'not-allowed':'pointer',fontFamily:'Syne,sans-serif',width:'100%'}}>
+              {loading?'⏳ GENERATING...':'⧉ GENERATE CAROUSELS'}
+            </button>
+          </div>
+        </div>
+
+        {/* RIGHT */}
+        <div style={{display:'flex',flexDirection:'column',gap:20}}>
+          {loading&&(
+            <div style={{background:'#0e0e16',border:'1px solid #252535',borderRadius:18,padding:'50px 20px',textAlign:'center'}}>
+              <div style={{display:'flex',justifyContent:'center',gap:8,marginBottom:20}}>
+                {[0,1,2].map(i=><div key={i} style={{width:10,height:10,borderRadius:'50%',background:['#6c63ff','#ff6584','#43e97b'][i],animation:'bounce 1.2s infinite ease-in-out',animationDelay:`${i*0.2}s`}}/>)}
+              </div>
+              <div style={{color:'#6c63ff',fontWeight:700,marginBottom:16,fontFamily:'Syne,sans-serif'}}>Building carousels...</div>
+              <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'center'}}>
+                {LS.map((s,i)=><div key={i} style={{fontSize:'0.76rem',padding:'4px 12px',borderRadius:20,color:i<step?'#43e97b':i===step?'#eeeef5':'#3a3a50',background:i===step?'#16161f':'transparent'}}>{i<step?'✓ '+s:s}</div>)}
+              </div>
+            </div>
+          )}
+          {err&&!loading&&(
+            <div style={{background:'#0e0e16',border:'1px solid rgba(255,101,132,0.3)',borderRadius:18,padding:'40px 20px',textAlign:'center'}}>
+              <div style={{fontSize:'2rem',marginBottom:12,opacity:.5}}>⚠</div>
+              <div style={{color:'#ff6584',fontSize:'0.88rem'}}>{err}</div>
+            </div>
+          )}
+          {!loading&&!err&&posts.length===0&&(
+            <div style={{background:'#0e0e16',border:'1px solid #252535',borderRadius:18,padding:'70px 20px',textAlign:'center'}}>
+              <div style={{fontSize:'2.5rem',marginBottom:14,opacity:.2}}>⧉</div>
+              <div style={{color:'#5a5a72',fontSize:'0.9rem',lineHeight:1.7,maxWidth:280,margin:'0 auto'}}>Fill in your business details and click Generate Carousels</div>
+            </div>
+          )}
+          {posts.map((post,pi)=>{
+            const th=TH[pi%TH.length];
+            const si=active[pi]||0;
+            const sl=post.slides[si]||post.slides[0];
+            return(
+              <div key={pi} className="fu" style={{background:'#0e0e16',border:'1px solid #252535',borderRadius:18,overflow:'hidden',animationDelay:`${pi*0.08}s`}}>
+                <div style={{padding:'13px 18px',borderBottom:'1px solid #252535',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  <span style={{fontSize:'0.67rem',color:'#5a5a72',fontFamily:'monospace'}}>Post {pi+1} of {posts.length}</span>
+                  <span style={{fontSize:'0.75rem',fontWeight:600,color:th.ac,background:`${th.ac}18`,border:`1px solid ${th.ac}44`,padding:'3px 10px',borderRadius:20}}>{post.topic}</span>
+                </div>
+                <div style={{padding:18,display:'grid',gridTemplateColumns:mob?'1fr':'1fr 250px',gap:18}}>
+                  <div>
+                    <div style={{fontSize:'0.62rem',fontWeight:700,letterSpacing:'1.4px',textTransform:'uppercase',color:'#5a5a72',marginBottom:10}}>5 Slides — Tap to preview</div>
+                    <div style={{display:'flex',gap:7,flexWrap:'wrap',marginBottom:14}}>
+                      {post.slides.map((t,ti)=>(
+                        <div key={ti} onClick={()=>setActive(a=>({...a,[pi]:ti}))} style={{width:68,height:68,borderRadius:10,overflow:'hidden',cursor:'pointer',border:`2px solid ${ti===si?th.ac:'transparent'}`,boxShadow:ti===si?`0 0 12px ${th.ac}55`:'none',flexShrink:0,transition:'all 0.15s'}}>
+                          <div style={{width:'100%',height:'100%',background:th.bg,color:th.tx,padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                            <div style={{fontSize:'0.48rem',color:th.ac,fontFamily:'monospace'}}>{ti+1}</div>
+                            <div style={{fontSize:'0.9rem'}}>{t.emoji}</div>
+                            <div style={{fontSize:'0.47rem',fontWeight:700,lineHeight:1.3,overflow:'hidden'}}>{t.title}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{background:th.bg,color:th.tx,borderRadius:14,padding:'22px 18px',minHeight:200,display:'flex',flexDirection:'column',gap:10}}>
+                      <div style={{fontSize:'0.6rem',color:th.ac,fontFamily:'monospace',opacity:.7}}>{si+1} / {post.slides.length}</div>
+                      <div style={{fontSize:'1.6rem'}}>{sl.emoji}</div>
+                      <div style={{fontFamily:'Syne,sans-serif',fontSize:'1.05rem',fontWeight:800,lineHeight:1.3}}>{sl.title}</div>
+                      <div style={{fontSize:'0.83rem',lineHeight:1.65,opacity:.85,flex:1}}>{sl.body}</div>
+                      {sl.cta&&<div style={{fontSize:'0.71rem',fontWeight:600,padding:'5px 14px',border:`1px solid ${th.ac}`,color:th.ac,borderRadius:20,alignSelf:'flex-start'}}>{sl.cta}</div>}
+                    </div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                    <div style={{fontSize:'0.62rem',fontWeight:700,letterSpacing:'1.4px',textTransform:'uppercase',color:'#5a5a72'}}>Caption + Hashtags</div>
+                    <div style={{background:'#16161f',border:'1px solid #2e2e42',borderRadius:10,padding:12,fontSize:'0.8rem',lineHeight:1.65,whiteSpace:'pre-line',flex:1}}>{post.caption}</div>
+                    <div style={{background:'#16161f',border:'1px solid #2e2e42',borderRadius:10,padding:12,fontSize:'0.72rem',color:'#6c63ff',lineHeight:1.9,wordBreak:'break-word'}}>{post.hashtags}</div>
+                    <button onClick={()=>copy(pi)} style={{padding:10,background:'transparent',border:`1px solid ${copied[pi]?'#43e97b':'#2e2e42'}`,borderRadius:9,color:copied[pi]?'#43e97b':'#5a5a72',fontSize:'0.72rem',fontWeight:700,letterSpacing:'1px',cursor:'pointer',fontFamily:'Syne,sans-serif'}}>
+                      {copied[pi]?'✓ COPIED!':'⊕ COPY CAPTION'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
